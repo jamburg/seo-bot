@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Генератор OG Image</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Inter, -apple-system, sans-serif; background: #07071a; color: #f0f0f5; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; min-height: 100vh; }
+  h1 { font-size: 1.6rem; background: linear-gradient(135deg, #6366f1, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 8px; }
+  p { color: #8888a8; margin-bottom: 24px; text-align: center; max-width: 600px; line-height: 1.5; }
+  canvas { border-radius: 16px; box-shadow: 0 0 60px rgba(99,102,241,0.15); max-width: 100%; height: auto; border: 1px solid rgba(255,255,255,0.08); }
+  .controls { margin-top: 24px; display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+  button { padding: 12px 28px; border: none; border-radius: 12px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-download { background: linear-gradient(135deg, #6366f1, #a78bfa); color: #fff; }
+  .btn-download:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,102,241,0.3); }
+  .btn-svg { background: rgba(255,255,255,0.06); color: #f0f0f5; border: 1px solid rgba(255,255,255,0.1); }
+  .btn-svg:hover { background: rgba(255,255,255,0.1); }
+  .info { margin-top: 16px; color: #555570; font-size: 0.85rem; text-align: center; max-width: 500px; }
+  .note { margin-top: 16px; padding: 12px 20px; background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.15); border-radius: 12px; color: #a78bfa; font-size: 0.9rem; max-width: 500px; text-align: center; }
+  .dims { margin-top: 12px; color: #555570; font-size: 0.8rem; }
+</style>
+</head>
+<body>
+  <h1>Генератор OG Image</h1>
+  <p>Картинка 1200×630px для превью в соцсетях. Нажмите «Скачать PNG» и загрузите файл на хостинг как <code>og-image.png</code>.</p>
+  <canvas id="ogCanvas" width="1200" height="630"></canvas>
+  <div class="controls">
+    <button class="btn-download" onclick="downloadPNG()">📥 Скачать PNG</button>
+    <button class="btn-svg" onclick="downloadSVG()">📄 Скачать SVG</button>
+  </div>
+  <div class="note">После загрузки на хостинг — проанализируйте сайт снова, балл поднимется!</div>
+  <div class="dims">1200 × 630 px • формат PNG</div>
+
+<script>
+function drawOG() {
+  const canvas = document.getElementById('ogCanvas');
+  const ctx = canvas.getContext('2d');
+  const w = 1200, h = 630;
+
+  function drawGlow(cx, cy, rx, ry, color, alpha) {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(rx, ry));
+    g.addColorStop(0, `rgba(${color}, ${alpha})`);
+    g.addColorStop(1, `rgba(${color}, 0)`);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  const grad = ctx.createLinearGradient(0, 0, w, h);
+  grad.addColorStop(0, '#07071a');
+  grad.addColorStop(0.5, '#0d0d2b');
+  grad.addColorStop(1, '#1a0a3e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+
+  drawGlow(180, 190, 700, 500, '99,102,241', 0.2);
+  drawGlow(1020, 126, 600, 400, '139,92,246', 0.15);
+  drawGlow(600, 535, 500, 300, '59,130,246', 0.1);
+
+  ctx.globalAlpha = 0.3;
+  ctx.strokeStyle = '#6366f1';
+  ctx.lineWidth = 0.5;
+  ctx.beginPath(); ctx.moveTo(0, 100); ctx.lineTo(400, 100); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(800, 530); ctx.lineTo(1200, 530); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  const particles = [[150,120,2,'99,102,241',0.4],[950,90,1.5,'167,139,250',0.3],[300,480,2.5,'139,92,246',0.2],[1050,500,1.5,'99,102,241',0.3],[80,350,1,'167,139,250',0.3],[1120,300,2,'139,92,246',0.2]];
+  particles.forEach(([px, py, r, color, alpha]) => {
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = `rgb(${color})`;
+    ctx.beginPath(); ctx.arc(px, py, r, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.globalAlpha = 1;
+
+  // Логотип
+  const lx = 600, ly = 180;
+  ctx.strokeStyle = '#a78bfa';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.globalAlpha = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(lx-12, ly-16); ctx.lineTo(lx-22, ly-11); ctx.lineTo(lx-12, ly-6); ctx.lineTo(lx-2, ly-11); ctx.closePath(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx-22, ly-1); ctx.lineTo(lx-12, ly+4); ctx.lineTo(lx-2, ly-1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx-22, ly-6); ctx.lineTo(lx-12, ly-1); ctx.lineTo(lx-2, ly-6); ctx.stroke();
+  ctx.globalAlpha = 0.3;
+  ctx.beginPath(); ctx.moveTo(lx-12, ly-6); ctx.lineTo(lx-22, ly-1); ctx.lineTo(lx-12, ly+4); ctx.lineTo(lx-2, ly-1); ctx.closePath(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx-22, ly+9); ctx.lineTo(lx-12, ly+14); ctx.lineTo(lx-2, ly+9); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx-22, ly+4); ctx.lineTo(lx-12, ly+9); ctx.lineTo(lx-2, ly+4); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Текст
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.shadowColor = 'transparent';
+
+  const gradText = ctx.createLinearGradient(300, 270, 900, 310);
+  gradText.addColorStop(0, '#6366f1');
+  gradText.addColorStop(1, '#a78bfa');
+  ctx.fillStyle = gradText;
+  ctx.font = 'bold 52px Inter, -apple-system, sans-serif';
+  ctx.fillText('SEO Анализатор', 600, 290);
+
+  ctx.fillStyle = '#8888a8';
+  ctx.font = '22px Inter, -apple-system, sans-serif';
+  ctx.fillText('Проверка мета-тегов, Open Graph и Twitter Cards', 600, 340);
+
+  // Рамка
+  const rx = 480, ry = 370, rw = 240, rh = 56;
+  ctx.fillStyle = 'rgba(99,102,241,0.08)';
+  ctx.beginPath(); ctx.roundRect(rx, ry, rw, rh, 12); ctx.fill();
+  ctx.strokeStyle = 'rgba(99,102,241,0.2)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(rx, ry, rw, rh, 12); ctx.stroke();
+
+  ctx.fillStyle = '#a78bfa';
+  ctx.font = '600 20px Inter, -apple-system, sans-serif';
+  ctx.fillText('Бесплатный онлайн-анализ', 600, 400);
+}
+
+drawOG();
+
+function downloadPNG() {
+  const canvas = document.getElementById('ogCanvas');
+  const link = document.createElement('a');
+  link.download = 'og-image.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function downloadSVG() {
+  const link = document.createElement('a');
+  link.download = 'og-image.svg';
+  link.href = '/og-image.svg';
+  link.click();
+}
+</script>
+</body>
+</html>

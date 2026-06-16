@@ -1,0 +1,10 @@
+npm run dev          # одновременно клиент + сервер
+npm run dev:client   # только Vite (http://localhost:5173)
+npm run dev:server   # только Express API (http://localhost:3001)
+
+5. База данных (SQLite через sql.js)
+Файл server/analyses.db
+API: POST /api/save, GET /api/history, GET /api/history/:id, DELETE /api/history/:id
+Автосохранение каждого анализа
+История последних 20 анализов с выпадающим списком
+Возможность загрузить и удалить записи

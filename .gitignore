@@ -1,0 +1,8 @@
+node_modules/
+dist/
+server/node_modules/
+__pycache__/
+*.pyc
+.env
+vite.log
+seo-report-*

@@ -1,0 +1,47 @@
+
+
+
+@VladimirKBot
+API  1571954870:AAGQb_rzSVGgZ2WS0NFhR_4TWFh-9WcznqE
+
+
+Что поправил:
+
+PROXY_URL → seo-analiser.j-biz.ru/proxy.php (а не landing-поддомен)
+Переведён на ParseMode.HTML (надёжнее, чем Markdown)
+Для деплоя на Render:
+
+Создать репозиторий из seo-bot/
+На Render → New Worker (not Web Service)
+Указать BOT_TOKEN в Environment Variables
+Бесплатный тир Render усыпляет worker через 15 мин простоя. Варианты:
+Поставить webhook поверх Flask + cron-job.org keep-alive
+Перейти на платный тир (без сна)
+Использовать PythonAnywhere (бесплатный always-on для 1 бота)
+Желаете сразу переделать на webhook + keep-alive, или сначала протестируете polling локально?
+
+Нет. Можно сделать проще:
+
+Залейте весь проект (SEO/) в один GitHub/GitLab репозиторий
+В Render → New Worker → Connect repo → в настройках укажите Root Directory: seo-bot
+Так Render будет видеть только seo-bot/ для сборки, а код всего проекта остаётся в одном репозитории.
+
+Либо создайте отдельный репозиторий только с содержимым seo-bot/ — как удобнее.
+
+Worker, а не Web Service, потому что бот работает через polling (не HTTP). На free типе Worker тоже засыпает через 15 мин — это нормально, но при редких сообщениях бот будет отвечать с задержкой. Если хотите обойти это — переделаем на webhook + keep-alive.
+
+Как создать репозиторий и залить проект:
+
+Зайти на github.com/new — имя, например seo-bot, публичный/приватный — как хочешь, создать.
+Из корня проекта (F:\Open-Code\SEO\) — **не из seo-bot/**, а из самого SEO\:
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/jamburg/seo-bot.git
+git branch -M main
+git push -u origin main
+
+…или отправить изменения в существующий репозиторий из командной строки
+git remote add origin https://github.com/jamburg/seo-bot.git
+ git branch -M main 
+git push -u origin main
