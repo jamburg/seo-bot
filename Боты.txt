@@ -5,7 +5,7 @@
 API  1571954870:AAGQb_rzSVGgZ2WS0NFhR_4TWFh-9WcznqE
 
 GitHub
-Токен   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
+Токен   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
 
 
 Что поправил:
