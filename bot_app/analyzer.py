@@ -367,7 +367,7 @@ def analyze_performance(soup, html, response_time):
     images = soup.find_all('img')
     images_with_alt = soup.find_all('img', alt=True)
     images_without_alt = [img for img in images if not img.get('alt')]
-    async_scripts = soup.find_all('script', src=True, async=True)
+    async_scripts = soup.find_all('script', src=True, attrs={'async': True})
     defer_scripts = soup.find_all('script', src=True, defer=True)
     lazy_images = soup.find_all('img', loading='lazy')
 
