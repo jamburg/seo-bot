@@ -2,8 +2,10 @@ import os
 import time
 import html
 import logging
+import asyncio
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
-from quart import Quart, request
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
@@ -16,10 +18,8 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get('BOT_TOKEN', '')
 PROXY_URL = os.environ.get('PROXY_URL', 'https://seo-analiser.j-biz.ru/proxy.php')
 PORT = int(os.environ.get('PORT', 8080))
-# WEBHOOK_DOMAIN = os.environ.get('WEBHOOK_DOMAIN', '')  # e.g. mybot.onrender.com
 
-app = Quart(__name__)
-ptb = Application.builder().token(TOKEN).build()
+PTB_APP = None
 
 
 def status_emoji(status):
@@ -149,43 +149,46 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await msg.edit_text(f'❌ <b>Ошибка:</b> {fmt(str(e))}', parse_mode=ParseMode.HTML)
 
 
-ptb.add_handler(CommandHandler('start', start))
-ptb.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
+class HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        if self.path == '/health':
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.end_headers()
+            self.wfile.write(b'OK')
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def log_message(self, format, *args):
+        pass
 
 
-@app.before_serving
-async def startup():
-    await ptb.initialize()
-    await ptb.start()
-    await ptb.bot.set_webhook(url=f'https://{os.environ["WEBHOOK_DOMAIN"]}/{TOKEN}')
-    logger.info('Webhook установлен')
+def run_health_server():
+    server = HTTPServer(('0.0.0.0', PORT), HealthHandler)
+    logger.info(f'Health server running on port {PORT}')
+    server.serve_forever()
 
 
-@app.after_serving
-async def shutdown():
-    await ptb.stop()
-    await ptb.shutdown()
+async def run_bot():
+    global PTB_APP
+    PTB_APP = Application.builder().token(TOKEN).build()
+    PTB_APP.add_handler(CommandHandler('start', start))
+    PTB_APP.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
 
-
-@app.route(f'/{TOKEN}', methods=['POST'])
-async def webhook():
-    data = await request.get_json(force=True)
-    update = Update.de_json(data, ptb.bot)
-    await ptb.update_queue.put(update)
-    return '', 200
-
-
-@app.route('/health')
-async def health():
-    return 'OK', 200
+    logger.info('Бот запущен (polling)')
+    await PTB_APP.run_polling()
 
 
 def main():
-    if not TOKEN or not os.environ.get('WEBHOOK_DOMAIN'):
-        logger.error('Укажите BOT_TOKEN и WEBHOOK_DOMAIN в переменных окружения')
+    if not TOKEN:
+        logger.error('BOT_TOKEN не задан!')
         return
-    logger.info(f'Запуск на порту {PORT}')
-    app.run(host='0.0.0.0', port=PORT)
+
+    health_thread = threading.Thread(target=run_health_server, daemon=True)
+    health_thread.start()
+
+    asyncio.run(run_bot())
 
 
 if __name__ == '__main__':
