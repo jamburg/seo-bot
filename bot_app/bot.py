@@ -4,6 +4,7 @@ import html
 import json
 import logging
 import threading
+import traceback
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 import requests
@@ -241,6 +242,7 @@ class AdminHandler(BaseHTTPRequestHandler):
         if self.path == '/health':
             self.send_response(200)
             self.send_header('Content-Type', 'text/plain')
+            self.send_header('Content-Length', '2')
             self.end_headers()
             self.wfile.write(b'OK')
         elif self.path == '/admin' or self.path == '/':
@@ -254,7 +256,7 @@ class AdminHandler(BaseHTTPRequestHandler):
                     bar = '█' * int(daily[d] / max_v * 10) or '▏'
                     rows.append(f'<tr><td>{d[-5:]}</td><td>{daily[d]}</td><td style="color:#a78bfa;">{bar}</td></tr>')
                 if not rows:
-                    rows.append('<tr><td colspan="3" style="color:#555570;text-align:center;">&#x41D;&#x435;&#x442; &#x434;&#x430;&#x43D;&#x43D;&#x44B;&#x445;</td></tr>')
+                    rows.append('<tr><td colspan="3" style="color:#555570;text-align:center;">Нет данных</td></tr>')
                 html_out = HTML_ADMIN.format(
                     total=s['totalAnalyses'],
                     users=s['uniqueUsers'],
@@ -263,27 +265,40 @@ class AdminHandler(BaseHTTPRequestHandler):
                     started=s['startedAt'][:19].replace('T', ' '),
                     daily_rows='\n'.join(rows),
                 )
+                body = html_out.encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'text/html; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
-                self.wfile.write(html_out.encode('utf-8'))
+                self.wfile.write(body)
             except Exception as e:
+                import traceback
+                err = f'Error: {e}\n{traceback.format_exc()}'
+                logger.error(err)
+                body = err.encode('utf-8')
                 self.send_response(500)
-                self.send_header('Content-Type', 'text/plain')
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
-                self.wfile.write(f'Error: {e}'.encode())
+                self.wfile.write(body)
         elif self.path == '/stats':
             try:
                 s = get_summary()
+                body = json.dumps(s, ensure_ascii=False).encode('utf-8')
                 self.send_response(200)
                 self.send_header('Content-Type', 'application/json')
+                self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
-                self.wfile.write(json.dumps(s, ensure_ascii=False).encode('utf-8'))
+                self.wfile.write(body)
             except Exception as e:
+                err = f'Error: {e}\n{traceback.format_exc()}'
+                logger.error(err)
+                body = err.encode('utf-8')
                 self.send_response(500)
-                self.send_header('Content-Type', 'text/plain')
+                self.send_header('Content-Type', 'text/plain; charset=utf-8')
+                self.send_header('Content-Length', str(len(body)))
                 self.end_headers()
-                self.wfile.write(f'Error: {e}'.encode())
+                self.wfile.write(body)
         else:
             self.send_response(404)
             self.end_headers()

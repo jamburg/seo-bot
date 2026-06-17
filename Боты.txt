@@ -6,6 +6,7 @@ API  1571954870:AAGQb_rzSVGgZ2WS0NFhR_4TWFh-9WcznqE
 
 GitHub
 Токен   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
+	1571954870:AAEsHKmnywnd_jIpqb5XgDW6QwtPWyQqKxc
 
 https://console.cron-job.org/jobs
 jamburg@bk.ru
