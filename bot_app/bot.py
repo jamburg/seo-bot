@@ -2,7 +2,6 @@ import os
 import time
 import html
 import logging
-import asyncio
 import threading
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import requests
@@ -18,8 +17,6 @@ logger = logging.getLogger(__name__)
 TOKEN = os.environ.get('BOT_TOKEN', '')
 PROXY_URL = os.environ.get('PROXY_URL', 'https://seo-analiser.j-biz.ru/proxy.php')
 PORT = int(os.environ.get('PORT', 8080))
-
-PTB_APP = None
 
 
 def status_emoji(status):
@@ -170,16 +167,6 @@ def run_health_server():
     server.serve_forever()
 
 
-async def run_bot():
-    global PTB_APP
-    PTB_APP = Application.builder().token(TOKEN).build()
-    PTB_APP.add_handler(CommandHandler('start', start))
-    PTB_APP.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
-
-    logger.info('Бот запущен (polling)')
-    await PTB_APP.run_polling()
-
-
 def main():
     if not TOKEN:
         logger.error('BOT_TOKEN не задан!')
@@ -188,7 +175,12 @@ def main():
     health_thread = threading.Thread(target=run_health_server, daemon=True)
     health_thread.start()
 
-    asyncio.run(run_bot())
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler('start', start))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
+
+    logger.info('Бот запущен (polling)')
+    app.run_polling()
 
 
 if __name__ == '__main__':
