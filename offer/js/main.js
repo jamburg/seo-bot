@@ -140,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (data.ok) {
         form.style.display = 'none'
         successDiv.classList.add('show')
+        window.afterOrderSuccess && window.afterOrderSuccess()
       } else {
         errorDiv.textContent = data.error || 'Произошла ошибка. Попробуйте позже.'
         errorDiv.classList.add('show')
@@ -158,4 +159,30 @@ document.addEventListener('DOMContentLoaded', () => {
   form.querySelectorAll('input, textarea').forEach(el => {
     el.addEventListener('input', () => el.closest('.form-group')?.classList.remove('error'))
   })
+
+  /* ====== Counters ====== */
+  const counterUrl = 'php/counter.php'
+  const footer = document.querySelector('.footer')
+
+  fetch(counterUrl)
+    .then(r => r.json())
+    .then(data => {
+      if (data.ok) {
+        const p = document.createElement('p')
+        p.style.cssText = 'font-size:0.85rem; color:var(--text-secondary); margin-top:8px;'
+        p.textContent = `👁 ${data.visits} | 📋 ${data.orders}`
+        footer?.querySelector('.container')?.appendChild(p)
+      }
+    })
+    .catch(() => {})
+
+  document.addEventListener('orderSuccess', () => {
+    fetch(counterUrl, { method: 'POST' }).catch(() => {})
+  })
+
+  const origOnSuccess = window.afterOrderSuccess
+  window.afterOrderSuccess = () => {
+    document.dispatchEvent(new Event('orderSuccess'))
+    if (origOnSuccess) origOnSuccess()
+  }
 })

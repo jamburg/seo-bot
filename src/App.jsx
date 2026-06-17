@@ -136,7 +136,14 @@ export default function App() {
     try {
       const data = await fetchHtml(url, AbortSignal.timeout(25000))
       const responseTime = Date.now() - startTime
-      const result = analyzeSeo(data.html, data.url || url, responseTime)
+      const result = analyzeSeo(data.html, data.url || url, responseTime, {
+        ssl: data.ssl || null,
+        gzip: data.contentEncoding || null,
+        robotsTxt: data.extra?.robotsTxt || null,
+        sitemapXml: data.extra?.sitemapXml || null,
+        serverResponseTime: data.responseTimeMs || null,
+        contentType: data.contentType || null,
+      })
       setAnalysis(result)
       const entry = saveHistoryItem(result)
       setHistory(loadHistory())

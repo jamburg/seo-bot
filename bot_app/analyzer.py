@@ -414,17 +414,22 @@ def analyze_performance(soup, html, response_time):
 def calculate_score(analysis):
     score = 50
     weights = {
-        'title': 20,
-        'description': 20,
-        'ogTags': 15,
-        'twitterTags': 10,
-        'canonical': 5,
-        'viewport': 5,
-        'charset': 5,
-        'h1': 10,
-        'lang': 3,
+        'title': 18,
+        'description': 18,
+        'ogTags': 12,
+        'twitterTags': 8,
+        'canonical': 4,
+        'viewport': 4,
+        'charset': 4,
+        'h1': 8,
+        'lang': 2,
         'favicon': 2,
-        'structuredData': 5,
+        'structuredData': 4,
+        'headings': 4,
+        'links': 4,
+        'contentRatio': 4,
+        'keywords': 4,
+        'metaKeywords': 2,
     }
 
     def weight_val(status):
@@ -441,12 +446,18 @@ def calculate_score(analysis):
     score += weights['lang'] * weight_val(analysis['lang']['status'])
     score += weights['favicon'] * weight_val(analysis['favicon']['status'])
     score += weights['structuredData'] * weight_val(analysis['structuredData']['status'])
+    score += weights['headings'] * weight_val(analysis['headings']['status'])
+    score += weights['links'] * weight_val(analysis['links']['status'])
+    score += weights['contentRatio'] * weight_val(analysis['contentRatio']['status'])
+    score += weights['keywords'] * weight_val(analysis['keywords']['status'])
+    score += weights['metaKeywords'] * weight_val(analysis['metaKeywords']['status'])
 
     return min(100, max(0, round(score)))
 
 
 def check_has_errors(analysis):
-    checks = [analysis['title'], analysis['description'], analysis['viewport'], analysis['charset'], analysis['h1']]
+    checks = [analysis['title'], analysis['description'], analysis['viewport'], analysis['charset'],
+              analysis['h1'], analysis['headings'], analysis['links']]
     return any(c['status'] == 'error' for c in checks) or \
         analysis['ogTags']['overallStatus'] == 'error' or \
         analysis['twitterTags']['overallStatus'] == 'error'
@@ -454,10 +465,175 @@ def check_has_errors(analysis):
 
 def check_has_warnings(analysis):
     checks = [analysis['title'], analysis['description'], analysis['canonical'], analysis['lang'],
-              analysis['favicon'], analysis['structuredData'], analysis['viewport'], analysis['charset'], analysis['h1']]
+              analysis['favicon'], analysis['structuredData'], analysis['viewport'], analysis['charset'],
+              analysis['h1'], analysis['headings'], analysis['links'], analysis['contentRatio'],
+              analysis['keywords']]
     return any(c['status'] == 'warning' for c in checks) or \
         analysis['ogTags']['overallStatus'] == 'warning' or \
         analysis['twitterTags']['overallStatus'] == 'warning'
+
+
+def analyze_headings(soup):
+    tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+    counts = {t: len(soup.find_all(t)) for t in tags}
+    order = []
+    for t in tags:
+        order.extend([t] * counts[t])
+
+    issues = []
+    recommendations = []
+    status = 'success'
+
+    if counts['h1'] == 0:
+        issues.append('H1 отсутствует')
+        recommendations.append('Добавьте один H1 на страницу')
+        status = 'error'
+    elif counts['h1'] > 1:
+        issues.append(f'Найдено {counts["h1"]} H1 (должен быть 1)')
+        recommendations.append('Оставьте только один H1')
+        status = 'warning'
+
+    prev_val = 0
+    for h in order:
+        val = int(h[1])
+        if val > prev_val + 1:
+            issues.append(f'Нарушение иерархии: {h} после h{prev_val}')
+            recommendations.append('Соблюдайте порядок h1→h2→h3')
+            status = 'warning'
+            break
+        prev_val = val
+
+    if not issues:
+        recommendations.append('Иерархия заголовков корректна')
+
+    return {'counts': counts, 'status': status, 'issues': issues, 'recommendations': recommendations}
+
+
+def analyze_links(soup, url):
+    base_parsed = urlparse(url)
+    base_netloc = base_parsed.netloc.lower()
+    a_tags = soup.find_all('a', href=True)
+
+    total = len(a_tags)
+    internal = 0
+    external = 0
+    nofollow = 0
+    broken = 0
+
+    for a in a_tags:
+        href = a.get('href', '')
+        rel = a.get('rel', [])
+        if isinstance(rel, str):
+            rel = rel.split()
+        if 'nofollow' in rel:
+            nofollow += 1
+
+        if href.startswith('/') or href.startswith('./') or href.startswith('../') or href.startswith('#'):
+            internal += 1
+        elif href.startswith('http'):
+            try:
+                link_parsed = urlparse(href)
+                if link_parsed.netloc.lower() == base_netloc:
+                    internal += 1
+                else:
+                    external += 1
+            except Exception:
+                external += 1
+
+    issues = []
+    recommendations = []
+    status = 'success'
+
+    if total == 0:
+        issues.append('На странице нет ни одной ссылки')
+        recommendations.append('Добавьте навигационные ссылки')
+        status = 'warning'
+
+    if nofollow > total * 0.5 and total > 0:
+        issues.append(f'Более 50% ссылок ({nofollow} из {total}) имеют nofollow')
+        recommendations.append('Используйте nofollow только для внешних/недоверенных ссылок')
+        status = 'warning'
+
+    return {
+        'total': total,
+        'internal': internal,
+        'external': external,
+        'nofollow': nofollow,
+        'broken': 0,
+        'status': status,
+        'issues': issues,
+        'recommendations': recommendations,
+    }
+
+
+def analyze_content_ratio(soup, html):
+    for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
+        tag.decompose()
+
+    text = soup.get_text(separator=' ', strip=True)
+    text_size = len(text.encode('utf-8'))
+    html_size = len(html)
+
+    if html_size == 0:
+        return {'textSize': 0, 'ratio': 0, 'status': 'info', 'issues': ['Нет контента'], 'recommendations': []}
+
+    ratio = round(text_size / html_size * 100, 1)
+    issues = []
+    recommendations = []
+    status = 'success'
+
+    if ratio < 10:
+        issues.append('Content-to-code ratio меньше 10%')
+        recommendations.append('Уменьшите количество кода, увеличьте текстовый контент')
+        status = 'warning'
+    elif ratio > 60:
+        recommendations.append('Хороший content-to-code ratio')
+
+    return {'textSize': text_size, 'ratio': ratio, 'status': status, 'issues': issues, 'recommendations': recommendations}
+
+
+def analyze_keywords(soup):
+    for tag in soup(['script', 'style', 'nav', 'header', 'footer']):
+        tag.decompose()
+
+    text = soup.get_text(separator=' ', strip=True)
+    words = re.findall(r'[а-яёА-ЯЁa-zA-Z]{4,}', text.lower())
+    stop_words = {'это', 'что', 'как', 'для', 'все', 'или', 'они', 'она', 'его', 'ее',
+                  'нет', 'да', 'уже', 'так', 'когда', 'даже', 'если', 'чтобы', 'было',
+                  'еще', 'уже', 'только', 'быть', 'можно', 'который', 'the', 'and', 'for',
+                  'that', 'this', 'with', 'from', 'were', 'have', 'been', 'are', 'was',
+                  'will', 'more', 'what', 'when', 'their', 'them', 'about', 'which', 'there'}
+
+    word_counts = {}
+    for w in words:
+        if w not in stop_words and len(w) >= 4:
+            word_counts[w] = word_counts.get(w, 0) + 1
+
+    if not word_counts:
+        return {'topKeywords': [], 'totalWords': len(words), 'status': 'info', 'issues': ['Мало текста для анализа'], 'recommendations': []}
+
+    total = sum(word_counts.values())
+    sorted_words = sorted(word_counts.items(), key=lambda x: -x[1])
+    top = sorted_words[:10]
+
+    return {
+        'topKeywords': top,
+        'totalWords': len(words),
+        'uniqueWords': len(word_counts),
+        'status': 'success',
+        'issues': [],
+        'recommendations': [f'Топ-5: {", ".join(w for w, _ in top[:5])}'],
+    }
+
+
+def analyze_meta_keywords(soup):
+    content = ''
+    el = soup.find('meta', attrs={'name': 'keywords'})
+    if el:
+        content = el.get('content', '').strip()
+    if not content:
+        return {'content': '(отсутствует)', 'status': 'info', 'issues': ['Мета-тег keywords не используется (современные поисковики его игнорируют)'], 'recommendations': ['Можно не использовать, но если есть — убедитесь, что не переспамлены']}
+    return {'content': content, 'status': 'info', 'issues': ['Meta keywords присутствует (не влияет на ранжирование)'], 'recommendations': ['Удалите этот тег или используйте натуральные ключевые слова']}
 
 
 def analyze_seo(html, url, response_time):
@@ -478,6 +654,11 @@ def analyze_seo(html, url, response_time):
         'favicon': analyze_favicon(soup),
         'structuredData': analyze_structured_data(soup),
         'performance': analyze_performance(soup, html, response_time),
+        'headings': analyze_headings(soup),
+        'links': analyze_links(soup, url),
+        'contentRatio': analyze_content_ratio(soup, html),
+        'keywords': analyze_keywords(soup),
+        'metaKeywords': analyze_meta_keywords(soup),
         'metaCount': len(soup.find_all('meta')),
         'hasErrors': False,
         'hasWarnings': False,

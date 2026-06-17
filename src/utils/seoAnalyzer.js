@@ -360,6 +360,162 @@ function analyzeStructuredData(doc) {
   };
 }
 
+function analyzeHeadings(doc) {
+  const tags = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+  const counts = {};
+  const contents = {};
+  let maxLevel = 0;
+  const issues = [];
+  const recommendations = [];
+
+  for (const tag of tags) {
+    const els = doc.querySelectorAll(tag);
+    counts[tag] = els.length;
+    if (els.length > 0) {
+      contents[tag] = Array.from(els).map(e => e.textContent.trim());
+      maxLevel = Math.max(maxLevel, parseInt(tag[1]));
+    }
+  }
+
+  if (maxLevel === 0) {
+    return { counts, contents, status: 'error', issues: ['Ни одного заголовка h1-h6 не найдено'], recommendations: ['Добавьте иерархию заголовков (h1, h2, h3...)'] };
+  }
+
+  let status = 'success';
+  if (counts['h1'] === 0) {
+    status = 'error';
+    issues.push('Нет h1');
+    recommendations.push('Каждая страница должна иметь один h1');
+  }
+  if (counts['h1'] > 1) {
+    status = 'warning';
+    issues.push(`h1 встречается ${counts['h1']} раз`);
+  }
+  if (counts['h2'] === 0 && counts['h3'] > 0) {
+    status = 'warning';
+    issues.push('Есть h3, но нет h2 — нарушена иерархия');
+    recommendations.push('Соблюдайте иерархию: h1 → h2 → h3');
+  }
+
+  return { counts, contents, status, issues, recommendations };
+}
+
+function analyzeLinks(doc, baseUrl) {
+  const allLinks = doc.querySelectorAll('a[href]');
+  const base = baseUrl ? new URL(baseUrl) : null;
+  const internal = [];
+  const external = [];
+  const nofollow = [];
+  const broken = [];
+  const issues = [];
+  const recommendations = [];
+
+  for (const link of allLinks) {
+    const href = link.getAttribute('href').trim();
+    if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:') || href.startsWith('javascript:')) continue;
+
+    let isExternal = false;
+    try {
+      const url = new URL(href, baseUrl);
+      isExternal = base && url.hostname !== base.hostname;
+    } catch {
+      broken.push(href);
+      continue;
+    }
+
+    if (isExternal) {
+      external.push(href);
+    } else {
+      internal.push(href);
+    }
+
+    const rel = link.getAttribute('rel') || '';
+    if (rel.includes('nofollow')) {
+      nofollow.push(href);
+    }
+  }
+
+  if (internal.length === 0 && external.length > 0) {
+    issues.push('Нет внутренних ссылок');
+    recommendations.push('Добавьте ссылки на другие страницы сайта');
+  }
+  if (external.length === 0 && internal.length > 0) {
+    issues.push('Нет внешних ссылок');
+  }
+  if (nofollow.length > internal.length * 0.5) {
+    issues.push('Более 50% ссылок с nofollow');
+    recommendations.push('Используйте nofollow только для внешних ссылок');
+  }
+
+  const total = internal.length + external.length;
+  const status = total > 0 ? 'success' : 'warning';
+  return { total, internal: internal.length, external: external.length, nofollow: nofollow.length, broken: broken.length, status, issues, recommendations };
+}
+
+function analyzeContentRatio(doc, html) {
+  const body = doc.querySelector('body');
+  const textContent = body ? body.textContent.replace(/\s+/g, ' ').trim() : '';
+  const textSize = new Blob([textContent]).size;
+  const htmlSize = html.length;
+  const ratio = htmlSize > 0 ? Math.round((textSize / htmlSize) * 100) : 0;
+
+  const issues = [];
+  const recommendations = [];
+  let status = 'success';
+
+  if (ratio < 5) {
+    status = 'warning';
+    issues.push(`Текст занимает только ${ratio}% от HTML`);
+    recommendations.push('Увеличьте количество уникального контента на странице');
+  } else if (ratio < 10) {
+    status = 'info';
+    issues.push(`Content-to-code ratio: ${ratio}%`);
+  } else if (ratio > 70) {
+    status = 'warning';
+    issues.push(`Очень высокое соотношение текста (${ratio}%) — возможен тонкий контент`);
+  }
+
+  return { textSize, htmlSize, ratio, status, issues, recommendations };
+}
+
+function analyzeKeywords(doc) {
+  const body = doc.querySelector('body');
+  if (!body) return { topKeywords: [], status: 'info', issues: [], recommendations: [] };
+
+  const text = body.textContent.toLowerCase();
+  const words = text.split(/[^а-яa-zё]+/).filter(w => w.length > 3 && w.length < 30);
+  const stopWords = ['что', 'это', 'для', 'все', 'ещё', 'когда', 'может', 'чтобы', 'такие', 'также', 'меня', 'того', 'more', 'this', 'that', 'with', 'from', 'your', 'have', 'been', 'will', 'they', 'their', 'what', 'about', 'which', 'there'];
+  const freq = {};
+
+  for (const word of words) {
+    if (stopWords.includes(word)) continue;
+    freq[word] = (freq[word] || 0) + 1;
+  }
+
+  const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 10);
+
+  if (sorted.length === 0) {
+    return { topKeywords: [], status: 'info', issues: ['Не удалось извлечь ключевые слова'], recommendations: [] };
+  }
+
+  const topKeyword = sorted[0];
+  const maxFreq = topKeyword[1];
+  const issues = [];
+  if (maxFreq > sorted.length > 1 ? sorted[1][1] * 5 : 100) {
+    issues.push(`Возможен переспам: "${topKeyword[0]}" (${maxFreq} раз)`);
+  }
+
+  return { topKeywords: sorted, status: issues.length > 0 ? 'warning' : 'info', issues, recommendations: [] };
+}
+
+function analyzeMetaKeywords(doc) {
+  const content = getMetaByName(doc, 'keywords');
+  if (!content) {
+    return { content: '(отсутствует)', status: 'info', issues: ['Мета-тег keywords не используется (это нормально, он устарел)'], recommendations: [] };
+  }
+  return { content: content.slice(0, 200), status: 'info', issues: ['Мета-тег keywords устарел и не влияет на ранжирование'], recommendations: ['Удалите keywords, сосредоточьтесь на качестве контента'] };
+}
+
 function analyzePerformance(doc, html, responseTime) {
   const scripts = doc.querySelectorAll('script[src]');
   const stylesheets = doc.querySelectorAll('link[rel="stylesheet"]');
@@ -408,49 +564,61 @@ function analyzePerformance(doc, html, responseTime) {
 function calculateScore(analysis) {
   let score = 50;
   const weights = {
-    title: 20,
-    description: 20,
-    ogTags: 15,
-    twitterTags: 10,
-    canonical: 5,
-    viewport: 5,
-    charset: 5,
-    h1: 10,
-    lang: 3,
+    title: 18,
+    description: 18,
+    ogTags: 12,
+    twitterTags: 8,
+    canonical: 4,
+    viewport: 4,
+    charset: 4,
+    h1: 8,
+    lang: 2,
     favicon: 2,
-    structuredData: 5,
+    structuredData: 4,
+    headings: 4,
+    links: 4,
+    contentRatio: 4,
+    keywords: 4,
+    metaKeywords: 2,
   };
 
-  score += weights.title * (analysis.title.status === 'success' ? 1 : analysis.title.status === 'warning' ? 0.5 : 0);
-  score += weights.description * (analysis.description.status === 'success' ? 1 : analysis.description.status === 'warning' ? 0.5 : 0);
-  score += weights.ogTags * (analysis.ogTags.overallStatus === 'success' ? 1 : analysis.ogTags.overallStatus === 'warning' ? 0.5 : 0);
-  score += weights.twitterTags * (analysis.twitterTags.overallStatus === 'success' ? 1 : analysis.twitterTags.overallStatus === 'warning' ? 0.5 : 0);
-  score += weights.canonical * (analysis.canonical.status === 'success' ? 1 : analysis.canonical.status === 'warning' ? 0.5 : 0);
-  score += weights.viewport * (analysis.viewport.status === 'success' ? 1 : analysis.viewport.status === 'warning' ? 0.5 : 0);
-  score += weights.charset * (analysis.charset.status === 'success' ? 1 : analysis.charset.status === 'warning' ? 0.5 : 0);
-  score += weights.h1 * (analysis.h1.status === 'success' ? 1 : analysis.h1.status === 'warning' ? 0.5 : 0);
-  score += weights.lang * (analysis.lang.status === 'success' ? 1 : analysis.lang.status === 'warning' ? 0.5 : 0);
-  score += weights.favicon * (analysis.favicon.status === 'success' ? 1 : analysis.favicon.status === 'warning' ? 0.5 : 0);
-  score += weights.structuredData * (analysis.structuredData.status === 'success' ? 1 : analysis.structuredData.status === 'warning' ? 0.5 : 0);
+  const w = (v) => v.status === 'success' ? 1 : v.status === 'warning' ? 0.5 : 0;
+
+  score += weights.title * w(analysis.title);
+  score += weights.description * w(analysis.description);
+  score += weights.ogTags * w({ status: analysis.ogTags.overallStatus });
+  score += weights.twitterTags * w({ status: analysis.twitterTags.overallStatus });
+  score += weights.canonical * w(analysis.canonical);
+  score += weights.viewport * w(analysis.viewport);
+  score += weights.charset * w(analysis.charset);
+  score += weights.h1 * w(analysis.h1);
+  score += weights.lang * w(analysis.lang);
+  score += weights.favicon * w(analysis.favicon);
+  score += weights.structuredData * w(analysis.structuredData);
+  score += weights.headings * w(analysis.headings);
+  score += weights.links * w(analysis.links);
+  score += weights.contentRatio * w(analysis.contentRatio);
+  score += weights.keywords * w(analysis.keywords);
+  score += weights.metaKeywords * w(analysis.metaKeywords);
 
   return Math.min(100, Math.max(0, Math.round(score)));
 }
 
 function checkHasErrors(analysis) {
-  const checks = [analysis.title, analysis.description, analysis.viewport, analysis.charset, analysis.h1];
+  const checks = [analysis.title, analysis.description, analysis.viewport, analysis.charset, analysis.h1, analysis.headings, analysis.links];
   return checks.some(c => c.status === 'error') ||
     analysis.ogTags.overallStatus === 'error' ||
     analysis.twitterTags.overallStatus === 'error';
 }
 
 function checkHasWarnings(analysis) {
-  const checks = [analysis.title, analysis.description, analysis.canonical, analysis.lang, analysis.favicon, analysis.structuredData, analysis.viewport, analysis.charset, analysis.h1];
+  const checks = [analysis.title, analysis.description, analysis.canonical, analysis.lang, analysis.favicon, analysis.structuredData, analysis.viewport, analysis.charset, analysis.h1, analysis.headings, analysis.links, analysis.contentRatio, analysis.keywords];
   return checks.some(c => c.status === 'warning') ||
     analysis.ogTags.overallStatus === 'warning' ||
     analysis.twitterTags.overallStatus === 'warning';
 }
 
-export function analyzeSeo(html, url, responseTime) {
+export function analyzeSeo(html, url, responseTime, extraData) {
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
 
@@ -474,6 +642,12 @@ export function analyzeSeo(html, url, responseTime) {
     favicon: analyzeFavicon(doc),
     structuredData: analyzeStructuredData(doc),
     performance: analyzePerformance(doc, html, responseTime),
+    headings: analyzeHeadings(doc),
+    links: analyzeLinks(doc, url),
+    contentRatio: analyzeContentRatio(doc, html),
+    keywords: analyzeKeywords(doc),
+    metaKeywords: analyzeMetaKeywords(doc),
+    server: extraData || null,
     metaCount: doc.querySelectorAll('meta').length,
     hasErrors: false,
     hasWarnings: false,

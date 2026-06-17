@@ -143,6 +143,54 @@ export default function SeoAnalysis({ analysis }) {
         { name: 'Изображения', value: analysis.performance ? `всего: ${analysis.performance.totalImages}, без alt: ${analysis.performance.imagesWithoutAlt}${analysis.performance.hasLazyImages ? ', lazy ✓' : ''}` : '—', status: analysis.performance?.imagesWithoutAlt === 0 ? 'success' : 'warning', item: { issues: analysis.performance?.imagesWithoutAlt > 0 ? [`${analysis.performance.imagesWithoutAlt} изображений без alt`] : [], recommendations: ['Добавьте alt-текст для всех изображений'] } },
       ]
     },
+    {
+      title: 'Структура заголовков',
+      icon: '📐',
+      defaultOpen: false,
+      items: [
+        ...(analysis.headings ? ['h1','h2','h3','h4','h5','h6'].filter(t => analysis.headings.counts[t] > 0).map(t => ({
+          name: t.toUpperCase(), value: `${analysis.headings.counts[t]} шт.`, status: t === 'h1' && analysis.headings.counts[t] === 1 ? 'success' : t === 'h1' && analysis.headings.counts[t] === 0 ? 'error' : analysis.headings.status === 'error' ? analysis.headings.status : 'success', item: { issues: [], recommendations: [] }
+        })) : []),
+        { name: 'Иерархия', value: analysis.headings?.status === 'success' ? 'Корректная' : 'Нарушена', status: analysis.headings?.status || 'info', item: analysis.headings || { issues: [], recommendations: [] } },
+      ]
+    },
+    {
+      title: 'Ссылки',
+      icon: '🔗',
+      defaultOpen: false,
+      items: [
+        { name: 'Всего ссылок', value: `${analysis.links?.total || 0}`, status: analysis.links?.total > 0 ? 'success' : 'warning', item: { issues: [], recommendations: [] } },
+        { name: 'Внутренние', value: `${analysis.links?.internal || 0}`, status: analysis.links?.internal > 0 ? 'success' : 'info', item: { issues: [], recommendations: [] } },
+        { name: 'Внешние', value: `${analysis.links?.external || 0}`, status: 'info', item: { issues: [], recommendations: [] } },
+        { name: 'nofollow', value: `${analysis.links?.nofollow || 0}`, status: analysis.links?.nofollow > analysis.links?.total * 0.5 ? 'warning' : 'info', item: { issues: analysis.links?.nofollow > analysis.links?.total * 0.5 ? ['Более 50% ссылок nofollow'] : [], recommendations: ['Используйте nofollow только для внешних ссылок'] } },
+        { name: 'Битые', value: `${analysis.links?.broken || 0}`, status: analysis.links?.broken > 0 ? 'warning' : 'success', item: { issues: analysis.links?.broken > 0 ? [`${analysis.links.broken} битых ссылок`] : [], recommendations: ['Проверьте и исправьте битые ссылки'] } },
+      ]
+    },
+    {
+      title: 'Сервер и соединение',
+      icon: '🖥️',
+      defaultOpen: false,
+      items: [
+        { name: 'SSL сертификат', value: analysis.server?.ssl?.valid ? 'Действителен' : (analysis.server?.ssl ? 'Проблемы' : 'Н/Д (HTTP)'), status: analysis.server?.ssl?.valid ? 'success' : (analysis.server?.ssl ? 'error' : 'info'), item: { issues: analysis.server?.ssl && !analysis.server?.ssl?.valid ? ['SSL сертификат недействителен'] : [], recommendations: ['Установите действительный SSL сертификат'], ...analysis.server?.ssl } },
+        { name: 'Эмитент SSL', value: analysis.server?.ssl?.issuer || '—', status: analysis.server?.ssl?.issuer ? 'info' : 'info', item: { issues: [], recommendations: [] } },
+        { name: 'Сжатие', value: analysis.server?.gzip ? `${analysis.server.gzip.toUpperCase()}` : 'Отсутствует', status: analysis.server?.gzip ? 'success' : 'warning', item: { issues: !analysis.server?.gzip ? ['Сжатие не включено'] : [], recommendations: ['Включите GZIP/Deflate/Brotli сжатие на сервере'] } },
+        { name: 'robots.txt', value: analysis.server?.robotsTxt?.exists ? 'Доступен' : 'Отсутствует', status: analysis.server?.robotsTxt?.exists ? 'success' : 'warning', item: { issues: !analysis.server?.robotsTxt?.exists ? ['Файл robots.txt не найден'] : [], recommendations: ['Создайте robots.txt для управления индексацией'] } },
+        { name: 'sitemap.xml', value: analysis.server?.sitemapXml?.exists ? 'Доступен' : 'Отсутствует', status: analysis.server?.sitemapXml?.exists ? 'success' : 'warning', item: { issues: !analysis.server?.sitemapXml?.exists ? ['Sitemap не найден'] : [], recommendations: ['Создайте sitemap.xml для ускорения индексации'] } },
+        { name: 'Content-Type', value: analysis.server?.contentType || '—', status: 'info', item: { issues: [], recommendations: [] } },
+        { name: 'Время ответа (сервер)', value: analysis.server?.serverResponseTime ? `${analysis.server.serverResponseTime}мс` : '—', status: analysis.server?.serverResponseTime < 500 ? 'success' : analysis.server?.serverResponseTime < 1500 ? 'warning' : 'error', item: { issues: [], recommendations: [] } },
+      ]
+    },
+    {
+      title: 'Контент',
+      icon: '📝',
+      defaultOpen: false,
+      items: [
+        { name: 'Content-to-code ratio', value: analysis.contentRatio ? `${analysis.contentRatio.ratio}%` : '—', status: analysis.contentRatio?.status || 'info', item: analysis.contentRatio || { issues: [], recommendations: [] } },
+        { name: 'Размер текста', value: analysis.contentRatio ? `${(analysis.contentRatio.textSize / 1024).toFixed(1)}KB` : '—', status: 'info', item: { issues: [], recommendations: [] } },
+        { name: 'Meta keywords', value: analysis.metaKeywords?.content || '(отсутствует)', status: analysis.metaKeywords?.status || 'info', item: analysis.metaKeywords || { issues: [], recommendations: [] } },
+        { name: 'Частые слова', value: analysis.keywords?.topKeywords?.slice(0, 5).map(([w]) => w).join(', ') || '—', status: analysis.keywords?.status || 'info', item: analysis.keywords || { issues: [], recommendations: [] } },
+      ]
+    },
   ]
 
   return (
