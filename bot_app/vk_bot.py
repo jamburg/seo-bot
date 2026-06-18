@@ -125,7 +125,7 @@ async def run_vk_bot():
             f'\U0001f4c5 **\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 7 \u0434\u043d\u0435\u0439:**{chart}'
         )
 
-    @bot.on.message(text='/email')
+    @bot.on.message(func=lambda msg: msg.text and msg.text.startswith('/email'))
     async def email_handler(message: Message):
         text = (message.text or '').replace('/email', '', 1).strip()
         user_id = message.from_id
