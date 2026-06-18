@@ -1,40 +1,28 @@
 import os
 import logging
-import smtplib
 import asyncio
-from email.mime.text import MIMEText
+import requests
 
 logger = logging.getLogger(__name__)
 
-SMTP_HOST = 'smtp.yandex.ru'
-SMTP_PORT = 587
-FROM_EMAIL = 'jamburg@yandex.ru'
-
-
-def send_email(to_email: str, subject: str, body: str) -> str:
-    password = os.environ.get('EMAIL_PASSWORD', '')
-    if not password:
-        return 'EMAIL_PASSWORD не задан'
-    try:
-        msg = MIMEText(body, 'plain', 'utf-8')
-        msg['Subject'] = subject
-        msg['From'] = FROM_EMAIL
-        msg['To'] = to_email
-
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as s:
-            s.starttls()
-            s.login(FROM_EMAIL, password)
-            s.send_message(msg)
-        logger.info(f'Email sent to {to_email}: {subject}')
-        return ''
-    except smtplib.SMTPAuthenticationError:
-        return 'Ошибка авторизации SMTP. Проверьте пароль приложения.'
-    except smtplib.SMTPRecipientsRefused:
-        return f'Адрес {to_email} отклонён сервером.'
-    except Exception as e:
-        logger.exception(f'Email send failed: {e}')
-        return f'Ошибка отправки: {e}'
+MAIL_PROXY_URL = os.environ.get('MAIL_PROXY_URL', 'https://seo-analiser.j-biz.ru/mail_proxy.php')
 
 
 async def send_email_async(to_email: str, subject: str, body: str) -> str:
-    return await asyncio.to_thread(send_email, to_email, subject, body)
+    try:
+        resp = await asyncio.to_thread(
+            requests.post,
+            MAIL_PROXY_URL,
+            data={'email': to_email, 'subject': subject, 'body': body},
+            timeout=30,
+        )
+        data = resp.json()
+        if data.get('ok'):
+            logger.info(f'Email sent to {to_email}: {subject}')
+            return ''
+        return data.get('error', 'Неизвестная ошибка')
+    except requests.exceptions.Timeout:
+        return 'Тайм-аут при отправке'
+    except Exception as e:
+        logger.exception(f'Email send failed: {e}')
+        return f'Ошибка отправки: {e}'
