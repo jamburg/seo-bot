@@ -123,9 +123,14 @@ async def run_vk_bot():
             f'\U0001f4c5 **\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 7 \u0434\u043d\u0435\u0439:**{chart}'
         )
 
+    @bot.on.raw_event('message_new', dataclass=None)
+    async def raw_msg(event):
+        logger.info(f'VK raw event: type=message_new data={str(event)[:200]}')
+
     @bot.on.message()
     async def any_message(message: Message):
-        text = message.text.strip()
+        text = (message.text or '').strip()
+        logger.info(f'VK message received: id={message.from_id} text="{text[:50] if text else "(empty)"}"')
         if text.startswith('/'):
             return
 
