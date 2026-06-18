@@ -1,3 +1,4 @@
 import threading
 
-bot_thread: threading.Thread = None
+tg_bot_thread: threading.Thread = None
+vk_bot_thread: threading.Thread = None

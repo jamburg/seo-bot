@@ -45,11 +45,17 @@ async def health():
 
 @app.get('/api/bot/status')
 async def bot_status():
-    bt = shared.bot_thread
-    alive = bt is not None and bt.is_alive()
+    tg = shared.tg_bot_thread
+    vk = shared.vk_bot_thread
     return {
-        'alive': alive,
-        'thread': bt.name if bt else None,
+        'telegram': {
+            'alive': tg is not None and tg.is_alive(),
+            'thread': tg.name if tg else None,
+        },
+        'vk': {
+            'alive': vk is not None and vk.is_alive(),
+            'thread': vk.name if vk else None,
+        },
     }
 
 

@@ -18,6 +18,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ParseMode
 
 import shared
+from vk_bot import run_vk_bot_polling
 import requests as reqlib
 from analyzer import analyze_seo
 from stats import track_analysis, track_error, get_summary
@@ -229,8 +230,11 @@ def main():
     from api import app as fastapi_app
     PORT = int(os.environ.get('PORT', 10000))
 
-    shared.bot_thread = threading.Thread(target=run_bot_polling, daemon=True)
-    shared.bot_thread.start()
+    shared.tg_bot_thread = threading.Thread(target=run_bot_polling, daemon=True)
+    shared.tg_bot_thread.start()
+
+    shared.vk_bot_thread = threading.Thread(target=run_vk_bot_polling, daemon=True)
+    shared.vk_bot_thread.start()
 
     logger.info(f'FastAPI сервер запущен на порту {PORT}')
     uvicorn.run(fastapi_app, host='0.0.0.0', port=PORT, log_level='info')
