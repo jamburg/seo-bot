@@ -12,6 +12,7 @@ import shared
 from analyzer import analyze_seo
 from stats import track_analysis, track_error, get_summary
 from leads import add_lead, get_leads, toggle_lead, delete_lead, get_lead_stats
+from emailer import send_email_async
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,88 @@ class LeadRequest(BaseModel):
 @app.get('/health')
 async def health():
     return {'status': 'ok'}
+
+
+@app.post('/api/email/send')
+async def api_email_send(email: str = Query(...), url: str = Query(...)):
+    from stats import track_analysis
+    import requests, time
+    try:
+        resp = requests.get(PROXY_URL, params={'url': url}, timeout=25,
+            headers={'User-Agent': 'Mozilla/5.0'})
+        data = resp.json()
+        if 'error' in data:
+            return {'error': data['error']}
+        html = data['html']
+        actual_url = data.get('url', url)
+        analysis = analyze_seo(html, actual_url, 500)
+        report = format_report_for_email(analysis)
+        err = await send_email_async(email, f'SEO отчёт: {url}', report)
+        if err:
+            return {'error': err}
+        track_analysis(0, 'email', url)
+        return {'ok': True, 'sent_to': email}
+    except Exception as e:
+        return {'error': str(e)}
+
+
+def format_report_for_email(analysis):
+    s = analysis['score']
+    emoji = '🟢' if s >= 80 else '🟡' if s >= 50 else '🔴'
+    url = analysis['url']
+    h = analysis['headings']
+    l = analysis['links']
+    c = analysis['contentRatio']
+    k = analysis['keywords']
+    p = analysis['performance']
+
+    lines = [
+        f'{emoji} SEO АНАЛИЗ: {url}',
+        '=' * 50,
+        f'Общий балл: {s}/100',
+        '',
+        f'Title: {analysis["title"]["content"][:80]}',
+        f'  Длина: {analysis["title"]["length"]} симв.',
+        f'Description: {analysis["description"]["length"]} симв.',
+        f'Кодировка: {analysis["charset"]["content"]}',
+        f'Viewport: {"есть" if analysis["viewport"]["status"] != "error" else "нет"}',
+        f'Язык: {analysis["lang"]["content"]}',
+        '',
+        '--- ЗАГОЛОВКИ ---',
+        f'H1: {analysis["h1"]["content"][:60] if analysis["h1"]["content"] != "(отсутствует)" else "нет"}',
+        f'Распределение: ' + ' | '.join(f'{t.upper()}: {h["counts"][t]}' for t in ['h1','h2','h3','h4'] if h['counts'][t] > 0),
+        '',
+        '--- ССЫЛКИ ---',
+        f'Всего: {l["total"]} | Внутр.: {l["internal"]} | Внешн.: {l["external"]}',
+        '',
+        '--- КОНТЕНТ ---',
+        f'Text/code ratio: {c["ratio"]}%',
+        f'Meta keywords: {analysis["metaKeywords"]["content"][:60]}',
+        f'Топ слов: {", ".join(w for w, _ in k["topKeywords"][:5])}' if k['topKeywords'] else 'Топ слов: —',
+        '',
+        '--- OPEN GRAPH ---',
+        f'og:title: {analysis["ogTags"]["title"]["content"][:60]}',
+        f'og:description: {analysis["ogTags"]["description"]["content"][:80]}',
+        f'og:image: {analysis["ogTags"]["image"]["content"][:60]}',
+        '',
+        '--- TWITTER CARDS ---',
+        f'twitter:card: {analysis["twitterTags"]["card"]["content"][:30]}',
+        f'twitter:title: {analysis["twitterTags"]["title"]["content"][:60]}',
+        '',
+        '--- ТЕХНИЧЕСКИЙ SEO ---',
+        f'Canonical: {analysis["canonical"]["content"][:60]}',
+        f'Robots: {analysis["robots"]["content"][:60]}',
+        f'Favicon: {"есть" if analysis["favicon"]["status"] != "error" else "нет"}',
+        f'Структ. данные: {"есть" if analysis["structuredData"]["status"] != "error" else "нет"}',
+        '',
+        '--- ПРОИЗВОДИТЕЛЬНОСТЬ ---',
+        f'Время: {p["responseTime"]:.0f}мс | HTML: {p["htmlSize"] // 1024} КБ',
+        f'Скрипты: {p["externalScripts"]} | CSS: {p["externalStylesheets"]} | Изобр.: {p["totalImages"]}',
+        '',
+        '=' * 50,
+        'SEO Анализатор | https://audit-seo.j-biz.ru',
+    ]
+    return '\n'.join(lines)
 
 
 @app.get('/api/bot/vk-test')

@@ -9,6 +9,7 @@ import shared
 
 from analyzer import analyze_seo
 from stats import track_analysis, track_error
+from emailer import send_email_async
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,7 @@ async def run_vk_bot():
             '\u0438 \u044f \u043f\u0440\u043e\u0432\u0435\u0440\u044e \u0435\u0433\u043e \u043c\u0435\u0442\u0430-\u0442\u0435\u0433\u0438\n\n'
             '\u041a\u043e\u043c\u0430\u043d\u0434\u044b:\n'
             '/stats \u2014 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u0431\u043e\u0442\u0430\n'
+            '/email \u2014 \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email\n'
             '/help \u2014 \u0441\u043f\u0440\u0430\u0432\u043a\u0430\n\n'
             '\u041f\u0440\u0438\u043c\u0435\u0440: https://example.com'
         )
@@ -122,6 +124,23 @@ async def run_vk_bot():
             f'\u2501\u2501\u2501\n'
             f'\U0001f4c5 **\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 7 \u0434\u043d\u0435\u0439:**{chart}'
         )
+
+    @bot.on.message(text='/email')
+    async def email_handler(message: Message):
+        text = (message.text or '').replace('/email', '', 1).strip()
+        user_id = message.from_id
+        entry = shared.last_reports.get(user_id)
+        if not entry:
+            await message.answer('\u26a0\ufe0f \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u0434\u0435\u043b\u0430\u0439\u0442\u0435 \u0430\u043d\u0430\u043b\u0438\u0437 \u2014 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 URL \u0441\u0430\u0439\u0442\u0430')
+            return
+        if not text or '@' not in text:
+            await message.answer('\U0001f4e7 \u0423\u043a\u0430\u0436\u0438\u0442\u0435 email: /email your@email.ru')
+            return
+        err = await send_email_async(text, f'SEO \u043e\u0442\u0447\u0451\u0442: {entry["url"]}', entry['report_text'])
+        if err:
+            await message.answer(f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430: {err}')
+        else:
+            await message.answer('\u2705 \u041e\u0442\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 email! \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0447\u0442\u0443.')
 
     @bot.on.raw_event('message_new', dataclass=None)
     async def raw_msg(event):
@@ -167,7 +186,9 @@ async def run_vk_bot():
             analysis = analyze_seo(html_content, actual_url, response_time)
             report = format_vk_report(analysis)
 
-            await message.answer(report)
+            shared.last_reports[message.from_id] = {'report_text': report, 'url': actual_url}
+            report_with_email = report + '\n\n\U0001f4e7 **\u041f\u043e\u043b\u043d\u044b\u0439 \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email:** /email your@email.ru'
+            await message.answer(report_with_email)
             track_analysis(message.from_id, f'vk_{message.from_id}', actual_url)
 
             if analysis['hasErrors'] or analysis['hasWarnings']:

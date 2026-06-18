@@ -22,6 +22,7 @@ from vk_bot import run_vk_bot_polling
 import requests as reqlib
 from analyzer import analyze_seo
 from stats import track_analysis, track_error, get_summary
+from emailer import send_email_async
 
 
 def status_emoji(status):
@@ -115,6 +116,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         '• Производительность\n\n'
         'Команды:\n'
         '/stats — статистика бота\n'
+        '/email — получить отчёт на email\n'
         '/help — справка\n\n'
         'Пример: <code>https://example.com</code>'
     )
@@ -140,6 +142,23 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f'━━━\n'
         f'📅 <b>Последние 7 дней:</b>{chart}'
     )
+
+
+async def email_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    entry = shared.last_reports.get(user_id)
+    if not entry:
+        await update.message.reply_html('⚠️ Сначала сделайте анализ — отправьте URL сайта')
+        return
+    text = update.message.text.replace('/email', '', 1).strip()
+    if not text or '@' not in text:
+        await update.message.reply_html('📧 Укажите email:\n<code>/email your@email.ru</code>')
+        return
+    err = await send_email_async(text, f'SEO отчёт: {entry["url"]}', entry['report_text'])
+    if err:
+        await update.message.reply_html(f'❌ <b>Ошибка:</b> {err}')
+    else:
+        await update.message.reply_html('✅ <b>Отчёт отправлен на email!</b> Проверьте почту.')
 
 
 async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -172,7 +191,9 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         analysis = analyze_seo(html_content, actual_url, response_time)
         report = format_report(analysis)
 
-        await msg.edit_text(report, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        shared.last_reports[user_id] = {'report_text': report, 'url': actual_url}
+        report_with_email = report + '\n\n📧 <b>Полный отчёт на email:</b> /email your@email.ru'
+        await msg.edit_text(report_with_email, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
         track_analysis(user_id, username, actual_url)
 
         if analysis['hasErrors'] or analysis['hasWarnings']:
@@ -205,6 +226,7 @@ def run_bot_polling():
         app.add_handler(CommandHandler('start', start))
         app.add_handler(CommandHandler('stats', stats_command))
         app.add_handler(CommandHandler('help', start))
+        app.add_handler(CommandHandler('email', email_cmd))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
 
         loop = asyncio.new_event_loop()
