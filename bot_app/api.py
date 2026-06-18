@@ -43,6 +43,26 @@ async def health():
     return {'status': 'ok'}
 
 
+@app.get('/api/bot/vk-test')
+async def bot_vk_test(url: str = 'https://example.com'):
+    try:
+        import requests, time
+        from analyzer import analyze_seo
+        resp = requests.get(PROXY_URL, params={'url': url}, timeout=25,
+            headers={'User-Agent': 'Mozilla/5.0'})
+        data = resp.json()
+        if 'error' in data:
+            return {'error': data['error']}
+        html = data['html']
+        actual_url = data.get('url', url)
+        analysis = analyze_seo(html, actual_url, 500)
+        from vk_bot import format_vk_report
+        report = format_vk_report(analysis)
+        return {'score': analysis['score'], 'report_preview': report[:500]}
+    except Exception as e:
+        return {'error': str(e)}
+
+
 @app.get('/api/bot/status')
 async def bot_status():
     tg = shared.tg_bot_thread
