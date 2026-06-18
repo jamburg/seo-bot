@@ -1,3 +1,7 @@
-CGIPassAuth On
-RewriteEngine On
-RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+#CGIPassAuth On
+#RewriteEngine On
+#RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+<Files "leads.json">
+  Require all denied
+</Files>

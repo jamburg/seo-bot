@@ -1,36 +1,85 @@
 <?php
+session_start();
+
 $password = 'Kbctyjr2003';
 
-$auth_user = $_SERVER['PHP_AUTH_USER'] ?? '';
-$auth_pw = $_SERVER['PHP_AUTH_PW'] ?? '';
-
-if (!$auth_user && !$auth_pw && isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    $auth = $_SERVER['HTTP_AUTHORIZATION'];
-    if (strpos($auth, 'Basic ') === 0) {
-        $decoded = base64_decode(substr($auth, 6));
-        if ($decoded && strpos($decoded, ':') !== false) {
-            list($auth_user, $auth_pw) = explode(':', $decoded, 2);
-        }
-    }
-}
-
-if (!$auth_user && !$auth_pw && isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-    $auth = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-    if (strpos($auth, 'Basic ') === 0) {
-        $decoded = base64_decode(substr($auth, 6));
-        if ($decoded && strpos($decoded, ':') !== false) {
-            list($auth_user, $auth_pw) = explode(':', $decoded, 2);
-        }
-    }
-}
-
-if ($auth_user !== 'admin' || $auth_pw !== $password) {
-    header('WWW-Authenticate: Basic realm="SEO Admin"');
-    header('HTTP/1.0 401 Unauthorized');
-    echo 'Доступ запрещён';
+if (isset($_GET['logout'])) {
+    session_destroy();
+    header('Location: admin.php');
     exit;
 }
 
+if (isset($_POST['login'])) {
+    if ($_POST['pass'] === $password) {
+        $_SESSION['admin'] = true;
+        header('Location: admin.php');
+        exit;
+    }
+    $error = 'Неверный пароль';
+}
+
+if (!($_SESSION['admin'] ?? false)) {
+?>
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Вход — SEO Admin</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,'Segoe UI',sans-serif; background:#07071a; color:#f0f0f5;
+  display:flex; align-items:center; justify-content:center; min-height:100vh; }
+.login-box { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px; padding:40px; width:340px; }
+h1 { font-size:1.3rem; margin-bottom:24px; text-align:center; color:#c4b5fd; }
+.form-group { margin-bottom:16px; position:relative; }
+label { display:block; font-size:0.85rem; color:#8888a8; margin-bottom:6px; }
+input { width:100%; padding:12px 14px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
+  border-radius:10px; color:#f0f0f5; font-size:1rem; outline:none; }
+input:focus { border-color:#a78bfa; }
+.pass-wrap { position:relative; }
+.pass-wrap input { padding-right:44px; }
+.eye-btn { position:absolute; right:12px; top:50%; transform:translateY(-50%); background:none; border:none;
+  cursor:pointer; color:#8888a8; font-size:1.2rem; padding:4px; }
+.eye-btn:hover { color:#c4b5fd; }
+.btn { width:100%; padding:12px; background:#7c3aed; border:none; border-radius:10px; color:#fff;
+  font-size:1rem; cursor:pointer; font-weight:600; transition:background 0.2s; }
+.btn:hover { background:#6d28d9; }
+.error { color:#ef4444; font-size:0.85rem; text-align:center; margin-bottom:12px; }
+</style>
+</head>
+<body>
+<div class="login-box">
+  <h1>&#x1F512; Вход в панель</h1>
+  <?php if (isset($error)): ?><div class="error"><?php echo $error; ?></div><?php endif; ?>
+  <form method="post">
+    <div class="form-group">
+      <label>Пароль</label>
+      <div class="pass-wrap">
+        <input type="password" name="pass" id="passInput" required autofocus>
+        <button type="button" class="eye-btn" id="eyeBtn" onclick="togglePass()">&#x1F441;</button>
+      </div>
+    </div>
+    <button type="submit" name="login" class="btn">Войти</button>
+  </form>
+</div>
+<script>
+function togglePass() {
+  const el = document.getElementById('passInput');
+  const btn = document.getElementById('eyeBtn');
+  if (el.type === 'password') { el.type = 'text'; btn.textContent = '\u{1F441}'; }
+  else { el.type = 'password'; btn.textContent = '\u{1F441}'; }
+}
+</script>
+</body>
+</html>
+<?php
+exit;
+}
+
+// ==== АДМИНКА ====
 $dataFile = __DIR__ . '/leads.json';
 $leads = [];
 if (file_exists($dataFile)) {
@@ -86,6 +135,7 @@ $totalCount = count($leads);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Заявки на SEO аудит</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #07071a; color: #f0f0f5; padding: 40px; }
@@ -110,6 +160,9 @@ tr.processed { opacity: 0.5; }
 .delete-btn { color: #ef4444; }
 .toggle-btn { color: #22c55e; }
 .empty { text-align: center; padding: 60px; color: #555570; }
+.header-bar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+.logout-btn { color:#8888a8; text-decoration:none; font-size:0.85rem; padding:6px 14px; border:1px solid rgba(255,255,255,0.1); border-radius:8px; transition:all 0.2s; }
+.logout-btn:hover { background:rgba(239,68,68,0.15); border-color:#ef4444; color:#ef4444; }
 @media (max-width:768px) {
   body { padding: 16px; }
   table, thead, tbody, th, td, tr { display: block; }
@@ -121,7 +174,11 @@ tr.processed { opacity: 0.5; }
 </style>
 </head>
 <body>
-<h1>&#x1F4CB; Заявки на SEO аудит</h1>
+<div class="header-bar">
+  <h1>&#x1F4CB; Заявки на SEO аудит</h1>
+  <a class="logout-btn" href="?logout">&#x1F6AA; Выйти</a>
+</div>
+
 <div class="stats">
   <span>&#x1F4C5; Новых: <?php echo $newCount; ?></span>
   <span>&#x1F4CA; Всего: <?php echo $totalCount; ?></span>

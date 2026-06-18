@@ -134,8 +134,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     try {
       const fd = new FormData(form)
-      const res = await fetch(form.action, { method: 'POST', body: fd })
-      const data = await res.json()
+      const body = JSON.stringify({
+        name: fd.get('name'),
+        phone: fd.get('phone'),
+        site: fd.get('site'),
+        comment: fd.get('comment') || ''
+      })
+      let data = { ok: false }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/leads`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        })
+        data = await res.json()
+      } catch {}
+
+      if (!data.ok) {
+        const res = await fetch(form.action, { method: 'POST', body: fd })
+        data = await res.json()
+      }
 
       if (data.ok) {
         form.style.display = 'none'
@@ -160,6 +179,9 @@ document.addEventListener('DOMContentLoaded', () => {
     el.addEventListener('input', () => el.closest('.form-group')?.classList.remove('error'))
   })
 
+  /* ====== API endpoint ====== */
+  const API_BASE = 'https://seo-bot-yavf.onrender.com'
+
   /* ====== Counters ====== */
   const counterUrl = 'php/counter.php'
   const footer = document.querySelector('.footer')
@@ -174,10 +196,21 @@ document.addEventListener('DOMContentLoaded', () => {
         footer?.querySelector('.container')?.appendChild(p)
       }
     })
-    .catch(() => {})
+    .catch(() => {
+      try {
+        fetch(`${API_BASE}/api/stats`).then(r => r.json()).then(s => {
+          const p = document.createElement('p')
+          p.style.cssText = 'font-size:0.85rem; color:var(--text-secondary); margin-top:8px;'
+          p.textContent = `👁 ${s.totalAnalyses || 0} | 📋 ${s.leads?.total || 0}`
+          footer?.querySelector('.container')?.appendChild(p)
+        })
+      } catch(e) {}
+    })
 
   document.addEventListener('orderSuccess', () => {
-    fetch(counterUrl, { method: 'POST' }).catch(() => {})
+    fetch(counterUrl, { method: 'POST' }).catch(() => {
+      fetch(`${API_BASE}/api/leads`, { method: 'POST' }).catch(() => {})
+    })
   })
 
   const origOnSuccess = window.afterOrderSuccess
