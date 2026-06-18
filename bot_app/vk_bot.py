@@ -79,8 +79,8 @@ URL_RE = re.compile(r'https?://[^\s]+')
 
 
 async def run_vk_bot():
-    from vkbottle import Bot, Message
-    from vkbottle.dispatch.rules.base import CommandRule
+    from vkbottle import Bot
+    from vkbottle.bot import Message
 
     bot = Bot(token=VK_TOKEN)
 
