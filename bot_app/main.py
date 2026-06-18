@@ -193,29 +193,32 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def run_bot_polling():
-    if not TOKEN:
-        logger.warning('BOT_TOKEN не задан — бот не запущен')
-        return
+    try:
+        if not TOKEN:
+            logger.warning('BOT_TOKEN не задан — бот не запущен')
+            return
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+        logger.info('Запуск Telegram бота...')
+        app = Application.builder().token(TOKEN).build()
+        app.add_handler(CommandHandler('start', start))
+        app.add_handler(CommandHandler('stats', stats_command))
+        app.add_handler(CommandHandler('help', start))
+        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
 
-    app = Application.builder().token(TOKEN).build()
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(CommandHandler('stats', stats_command))
-    app.add_handler(CommandHandler('help', start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
-
-    bot_app = app
-    logger.info('Telegram бот запущен (polling)')
-    app.run_polling(drop_pending_updates=True)
+        logger.info('Telegram бот запущен (polling)')
+        app.run_polling(drop_pending_updates=True)
+    except Exception as e:
+        logger.exception(f'Ошибка в боте: {e}')
 
 
 PORT = int(os.environ.get('PORT', 10000))
 
+bot_thread = None
+
 
 def main():
     from api import app as fastapi_app
+    global bot_thread
     PORT = int(os.environ.get('PORT', 10000))
 
     bot_thread = threading.Thread(target=run_bot_polling, daemon=True)

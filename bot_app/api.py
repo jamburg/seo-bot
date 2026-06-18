@@ -42,6 +42,19 @@ async def health():
     return {'status': 'ok'}
 
 
+@app.get('/api/bot/status')
+async def bot_status():
+    try:
+        from main import bot_thread
+        alive = bot_thread is not None and bot_thread.is_alive()
+        return {
+            'alive': alive,
+            'thread': bot_thread.name if bot_thread else None,
+        }
+    except Exception as e:
+        return {'alive': False, 'error': str(e)}
+
+
 @app.post('/api/analyze')
 async def api_analyze(req: AnalyzeRequest):
     url = req.url.strip()
