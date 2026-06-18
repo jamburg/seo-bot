@@ -125,22 +125,7 @@ async def run_vk_bot():
             f'\U0001f4c5 **\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 7 \u0434\u043d\u0435\u0439:**{chart}'
         )
 
-    @bot.on.message(func=lambda msg: msg.text and msg.text.startswith('/email'))
-    async def email_handler(message: Message):
-        text = (message.text or '').replace('/email', '', 1).strip()
-        user_id = message.from_id
-        entry = shared.last_reports.get(user_id)
-        if not entry:
-            await message.answer('\u26a0\ufe0f \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u0434\u0435\u043b\u0430\u0439\u0442\u0435 \u0430\u043d\u0430\u043b\u0438\u0437 \u2014 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 URL \u0441\u0430\u0439\u0442\u0430')
-            return
-        if not text or '@' not in text:
-            await message.answer('\U0001f4e7 \u0423\u043a\u0430\u0436\u0438\u0442\u0435 email: /email your@email.ru')
-            return
-        err = await send_email_async(text, f'SEO \u043e\u0442\u0447\u0451\u0442: {entry["url"]}', entry['report_text'])
-        if err:
-            await message.answer(f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430: {err}')
-        else:
-            await message.answer('\u2705 \u041e\u0442\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 email! \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0447\u0442\u0443.')
+
 
     @bot.on.raw_event('message_new', dataclass=None)
     async def raw_msg(event):
@@ -150,7 +135,23 @@ async def run_vk_bot():
     async def any_message(message: Message):
         text = (message.text or '').strip()
         logger.info(f'VK message received: id={message.from_id} text="{text[:50] if text else "(empty)"}"')
-        if text.startswith('/'):
+        if text.startswith('/email'):
+            email_text = text.replace('/email', '', 1).strip()
+            entry = shared.last_reports.get(message.from_id)
+            if not entry:
+                await message.answer('\u26a0\ufe0f \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u0434\u0435\u043b\u0430\u0439\u0442\u0435 \u0430\u043d\u0430\u043b\u0438\u0437 \u2014 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 URL \u0441\u0430\u0439\u0442\u0430')
+                return
+            if not email_text or '@' not in email_text:
+                await message.answer('\U0001f4e7 \u0423\u043a\u0430\u0436\u0438\u0442\u0435 email: /email your@email.ru')
+                return
+            err = await send_email_async(email_text, f'SEO \u043e\u0442\u0447\u0451\u0442: {entry["url"]}', entry['report_text'])
+            if err:
+                await message.answer(f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430: {err}')
+            else:
+                await message.answer('\u2705 \u041e\u0442\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 email! \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0447\u0442\u0443.')
+            return
+
+        if text.startswith('/') and not text.startswith('/email'):
             return
 
         match = URL_RE.search(text)
