@@ -55,6 +55,7 @@ async def bot_status():
         'vk': {
             'alive': vk is not None and vk.is_alive(),
             'thread': vk.name if vk else None,
+            'error': shared.vk_bot_error,
         },
     }
 

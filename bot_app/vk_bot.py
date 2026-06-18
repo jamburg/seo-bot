@@ -5,6 +5,7 @@ import asyncio
 import time
 
 import requests
+import shared
 
 from analyzer import analyze_seo
 from stats import track_analysis, track_error
@@ -195,4 +196,5 @@ def run_vk_bot_polling():
         asyncio.set_event_loop(loop)
         loop.run_until_complete(run_vk_bot())
     except Exception as e:
+        shared.vk_bot_error = str(e)
         logger.exception(f'\u041e\u0448\u0438\u0431\u043a\u0430 \u0432 VK \u0431\u043e\u0442\u0435: {e}')

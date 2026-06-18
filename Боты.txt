@@ -7,6 +7,12 @@ API  1571954870:AAGQb_rzSVGgZ2WS0NFhR_4TWFh-9WcznqE
 GitHub
 Токен   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
 	1571954870:AAEsHKmnywnd_jIpqb5XgDW6QwtPWyQqKxc
+	1571954870:AAG0RW2lNw96jQUt9uJomj21EiAcbQGOL8Y
+-------
+
+VK API Версия API 5.199
+	vk1.a.C4lwyR709CbeLm_etM517zJ0TTYXAMsMEGhQ26JhBskByCdotqVjLOAQerClmikaNH33pCwk_yPEYlFlnF62j0Lg5MNymn5b1EHDe9xAkz76HfEUndcWBmomA6xv8otahPzNf7QVn5CXBxJ8NcO5hGQCeSFYwt_DwuHgfFPcLr9G2NI5zTpT_UAY-q0SiYtQIQqeeLzfsUE-fnG8iWvg5w
+-------
 
 https://console.cron-job.org/jobs
 jamburg@bk.ru
