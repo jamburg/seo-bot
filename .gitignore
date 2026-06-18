@@ -8,3 +8,6 @@ vite.log
 vite.err
 seo-report-*
 server/*.db
+*.zip
+bot_app/stats.json
+bot_app/leads.json

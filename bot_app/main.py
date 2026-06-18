@@ -17,6 +17,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
+import requests as http_requests
 from analyzer import analyze_seo
 from stats import track_analysis, track_error, get_summary
 
@@ -149,11 +150,10 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         url = 'https://' + url
 
     msg = await update.message.reply_text('🔍 Анализирую сайт...')
-    import requests
 
     try:
         start_time = time.time()
-        resp = requests.get(
+        resp = http_requests.get(
             PROXY_URL,
             params={'url': url},
             timeout=25,
