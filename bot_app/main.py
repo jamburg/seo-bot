@@ -17,7 +17,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
-import requests as http_requests
+import requests as reqlib
 from analyzer import analyze_seo
 from stats import track_analysis, track_error, get_summary
 
@@ -153,7 +153,7 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     try:
         start_time = time.time()
-        resp = http_requests.get(
+        resp = reqlib.get(
             PROXY_URL,
             params={'url': url},
             timeout=25,
@@ -184,7 +184,7 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_html(
                     '💡 <b>Рекомендации:</b>\n' + '\n'.join(f'• {fmt(i)}' for i in issues[:5])
                 )
-    except requests.exceptions.Timeout:
+    except reqlib.exceptions.Timeout:
         await msg.edit_text('⏱ <b>Тайм-аут</b> при загрузке страницы.', parse_mode=ParseMode.HTML)
         track_error(f'Timeout: {url}')
     except Exception as e:
