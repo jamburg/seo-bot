@@ -206,8 +206,18 @@ def run_bot_polling():
         app.add_handler(CommandHandler('help', start))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
 
-        logger.info('Telegram бот запущен (polling)')
-        app.run_polling(drop_pending_updates=True)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        async def start_bot():
+            await app.initialize()
+            await app.start()
+            await app.updater.start_polling(drop_pending_updates=True)
+            logger.info('Telegram бот запущен (polling)')
+            while True:
+                await asyncio.sleep(3600)
+
+        loop.run_until_complete(start_bot())
     except Exception as e:
         logger.exception(f'Ошибка в боте: {e}')
 
