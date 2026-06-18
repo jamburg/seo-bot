@@ -8,6 +8,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
+import shared
 from analyzer import analyze_seo
 from stats import track_analysis, track_error, get_summary
 from leads import add_lead, get_leads, toggle_lead, delete_lead, get_lead_stats
@@ -44,15 +45,12 @@ async def health():
 
 @app.get('/api/bot/status')
 async def bot_status():
-    try:
-        from main import bot_thread
-        alive = bot_thread is not None and bot_thread.is_alive()
-        return {
-            'alive': alive,
-            'thread': bot_thread.name if bot_thread else None,
-        }
-    except Exception as e:
-        return {'alive': False, 'error': str(e)}
+    bt = shared.bot_thread
+    alive = bt is not None and bt.is_alive()
+    return {
+        'alive': alive,
+        'thread': bt.name if bt else None,
+    }
 
 
 @app.post('/api/analyze')
