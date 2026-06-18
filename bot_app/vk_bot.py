@@ -146,7 +146,7 @@ async def run_vk_bot():
         if not url.startswith('http'):
             url = 'https://' + url
 
-        msg = await message.answer('\U0001f50d \u0410\u043d\u0430\u043b\u0438\u0437\u0438\u0440\u0443\u044e \u0441\u0430\u0439\u0442...')
+        await message.answer('\U0001f50d \u0410\u043d\u0430\u043b\u0438\u0437\u0438\u0440\u0443\u044e \u0441\u0430\u0439\u0442...')
 
         try:
             start_time = time.time()
@@ -167,7 +167,7 @@ async def run_vk_bot():
             analysis = analyze_seo(html_content, actual_url, response_time)
             report = format_vk_report(analysis)
 
-            await msg.answer(report)
+            await message.answer(report)
             track_analysis(message.from_id, f'vk_{message.from_id}', actual_url)
 
             if analysis['hasErrors'] or analysis['hasWarnings']:
