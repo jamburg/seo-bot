@@ -45,12 +45,20 @@ async def health():
 
 @app.get('/api/bot/status')
 async def bot_status():
-    bt = shared.bot_thread
-    alive = bt is not None and bt.is_alive()
-    return {
-        'alive': alive,
-        'thread': bt.name if bt else None,
-    }
+    import threading, sys
+    threads = threading.enumerate()
+    bot_threads = [t.name for t in threads if 'bot' in t.name.lower() or 'polling' in t.name.lower()]
+    try:
+        bt = shared.bot_thread
+        return {
+            'alive': bt is not None and bt.is_alive(),
+            'thread': bt.name if bt else None,
+            'all_threads': [t.name for t in threads],
+            'bot_threads': bot_threads,
+            'shared_value': repr(bt),
+        }
+    except Exception as e:
+        return {'error': str(e), 'all_threads': [t.name for t in threads]}
 
 
 @app.post('/api/analyze')
