@@ -189,7 +189,7 @@ async def run_vk_bot():
             report = format_vk_report(analysis)
 
             shared.last_reports[message.from_id] = {'report_text': report, 'url': actual_url}
-            landing_url = f'https://audit-seo.j-biz.ru/?url={quote(actual_url)}'
+            landing_url = f'https://audit-seo.j-biz.ru/?url={quote(actual_url, safe="")}'
             report_with_email = report + f'\n\n\U0001f4e7 **\u041f\u043e\u043b\u043d\u044b\u0439 \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email:** /email your@email.ru\n\U0001f680 **\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0430\u0443\u0434\u0438\u0442:** {landing_url}'
             await message.answer(report_with_email)
             track_analysis(message.from_id, f'vk_{message.from_id}', actual_url)
