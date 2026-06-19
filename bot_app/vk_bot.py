@@ -214,7 +214,7 @@ async def run_vk_bot():
             keyboard = (
                 Keyboard(inline=True)
                 .add(Text('\U0001f4e7 \u041f\u043e\u043b\u043d\u044b\u0439 \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email'), color=KeyboardButtonColor.PRIMARY)
-                .add(OpenLink(landing_url), color=KeyboardButtonColor.SECONDARY)
+                .add(OpenLink(landing_url, label='\U0001f680 \u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0430\u0443\u0434\u0438\u0442'), color=KeyboardButtonColor.SECONDARY)
             )
             await message.answer(report, keyboard=keyboard)
             track_analysis(message.from_id, f'vk_{message.from_id}', actual_url)
