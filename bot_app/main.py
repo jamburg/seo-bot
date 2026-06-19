@@ -13,8 +13,8 @@ TOKEN = os.environ.get('BOT_TOKEN', '')
 PROXY_URL = os.environ.get('PROXY_URL', 'https://seo-analiser.j-biz.ru/proxy.php')
 
 import uvicorn
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode
 
 import shared
@@ -117,7 +117,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         '• Производительность\n\n'
         'Команды:\n'
         '/stats — статистика бота\n'
-        '/email — получить отчёт на email\n'
         '/help — справка\n\n'
         'Пример: <code>https://example.com</code>'
     )
@@ -145,6 +144,15 @@ async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def handle_email_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    shared.user_email_pending.add(user_id)
+    await query.edit_message_reply_markup(reply_markup=None)
+    await query.message.reply_html('\u2709\ufe0f <b>\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0432\u0430\u0448 email</b> \u0434\u043b\u044f \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044f \u043e\u0442\u0447\u0451\u0442\u0430:')
+
+
 async def email_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     entry = shared.last_reports.get(user_id)
@@ -163,10 +171,28 @@ async def email_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    url = update.message.text.strip()
     user = update.effective_user
     user_id = user.id if user else 0
     username = user.username or user.first_name or 'unknown'
+
+    if user_id in shared.user_email_pending:
+        shared.user_email_pending.discard(user_id)
+        text = update.message.text.strip()
+        entry = shared.last_reports.get(user_id)
+        if not entry:
+            await update.message.reply_html('⚠️ Сначала сделайте анализ — отправьте URL сайта')
+            return
+        if not text or '@' not in text:
+            await update.message.reply_html('\u2709\ufe0f <b>\u042d\u0442\u043e \u043d\u0435 email.</b> \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437:')
+            return
+        err = await send_email_async(text, f'SEO \u043e\u0442\u0447\u0451\u0442: {entry["url"]}', entry['report_text'])
+        if err:
+            await update.message.reply_html(f'❌ <b>\u041e\u0448\u0438\u0431\u043a\u0430:</b> {err}')
+        else:
+            await update.message.reply_html('✅ <b>\u041e\u0442\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 email!</b> \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0447\u0442\u0443.')
+        return
+
+    url = update.message.text.strip()
 
     if not url.startswith('http://') and not url.startswith('https://'):
         url = 'https://' + url
@@ -194,8 +220,11 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         shared.last_reports[user_id] = {'report_text': report, 'url': actual_url}
         landing_url = f'https://audit-seo.j-biz.ru/?url={quote(actual_url, safe="")}'
-        report_with_email = report + f'\n\n📧 <b>Полный отчёт на email:</b> /email your@email.ru\n🚀 <b>Заказать аудит:</b> <a href="{landing_url}">audit-seo.j-biz.ru</a>'
-        await msg.edit_text(report_with_email, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton('\U0001f4e7 \u041f\u043e\u043b\u043d\u044b\u0439 \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email', callback_data='email_request'),
+             InlineKeyboardButton('\U0001f680 \u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0430\u0443\u0434\u0438\u0442', url=landing_url)]
+        ])
+        await msg.edit_text(report, parse_mode=ParseMode.HTML, disable_web_page_preview=True, reply_markup=keyboard)
         track_analysis(user_id, username, actual_url)
 
         if analysis['hasErrors'] or analysis['hasWarnings']:
@@ -229,6 +258,7 @@ def run_bot_polling():
         app.add_handler(CommandHandler('stats', stats_command))
         app.add_handler(CommandHandler('help', start))
         app.add_handler(CommandHandler('email', email_cmd))
+        app.add_handler(CallbackQueryHandler(handle_email_request, pattern='^email_request$'))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
 
         loop = asyncio.new_event_loop()

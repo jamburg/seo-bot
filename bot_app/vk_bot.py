@@ -81,7 +81,7 @@ URL_RE = re.compile(r'https?://[^\s]+')
 
 
 async def run_vk_bot():
-    from vkbottle import Bot
+    from vkbottle import Bot, Keyboard, KeyboardButtonColor, Text, OpenLink
     from vkbottle.bot import Message
 
     bot = Bot(token=VK_TOKEN)
@@ -94,7 +94,6 @@ async def run_vk_bot():
             '\u0438 \u044f \u043f\u0440\u043e\u0432\u0435\u0440\u044e \u0435\u0433\u043e \u043c\u0435\u0442\u0430-\u0442\u0435\u0433\u0438\n\n'
             '\u041a\u043e\u043c\u0430\u043d\u0434\u044b:\n'
             '/stats \u2014 \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u0431\u043e\u0442\u0430\n'
-            '/email \u2014 \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email\n'
             '/help \u2014 \u0441\u043f\u0440\u0430\u0432\u043a\u0430\n\n'
             '\u041f\u0440\u0438\u043c\u0435\u0440: https://example.com'
         )
@@ -136,6 +135,28 @@ async def run_vk_bot():
     async def any_message(message: Message):
         text = (message.text or '').strip()
         logger.info(f'VK message received: id={message.from_id} text="{text[:50] if text else "(empty)"}"')
+
+        if text == '\U0001f4e7 \u041f\u043e\u043b\u043d\u044b\u0439 \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email':
+            shared.user_email_pending.add(message.from_id)
+            await message.answer('\u2709\ufe0f \u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0432\u0430\u0448 email \u0434\u043b\u044f \u043f\u043e\u043b\u0443\u0447\u0435\u043d\u0438\u044f \u043e\u0442\u0447\u0451\u0442\u0430:')
+            return
+
+        if message.from_id in shared.user_email_pending:
+            shared.user_email_pending.discard(message.from_id)
+            entry = shared.last_reports.get(message.from_id)
+            if not entry:
+                await message.answer('\u26a0\ufe0f \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u0434\u0435\u043b\u0430\u0439\u0442\u0435 \u0430\u043d\u0430\u043b\u0438\u0437 \u2014 \u043e\u0442\u043f\u0440\u0430\u0432\u044c\u0442\u0435 URL \u0441\u0430\u0439\u0442\u0430')
+                return
+            if not text or '@' not in text:
+                await message.answer('\u2709\ufe0f \u042d\u0442\u043e \u043d\u0435 email. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437:')
+                return
+            err = await send_email_async(text, f'SEO \u043e\u0442\u0447\u0451\u0442: {entry["url"]}', entry['report_text'])
+            if err:
+                await message.answer(f'\u274c \u041e\u0448\u0438\u0431\u043a\u0430: {err}')
+            else:
+                await message.answer('\u2705 \u041e\u0442\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 email! \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0447\u0442\u0443.')
+            return
+
         if text.startswith('/email'):
             email_text = text.replace('/email', '', 1).strip()
             entry = shared.last_reports.get(message.from_id)
@@ -152,7 +173,7 @@ async def run_vk_bot():
                 await message.answer('\u2705 \u041e\u0442\u0447\u0451\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u0435\u043d \u043d\u0430 email! \u041f\u0440\u043e\u0432\u0435\u0440\u044c\u0442\u0435 \u043f\u043e\u0447\u0442\u0443.')
             return
 
-        if text.startswith('/') and not text.startswith('/email'):
+        if text.startswith('/'):
             return
 
         match = URL_RE.search(text)
@@ -190,8 +211,12 @@ async def run_vk_bot():
 
             shared.last_reports[message.from_id] = {'report_text': report, 'url': actual_url}
             landing_url = f'https://audit-seo.j-biz.ru/?url={quote(actual_url, safe="")}'
-            report_with_email = report + f'\n\n\U0001f4e7 **\u041f\u043e\u043b\u043d\u044b\u0439 \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email:** /email your@email.ru\n\U0001f680 **\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0430\u0443\u0434\u0438\u0442:** {landing_url}'
-            await message.answer(report_with_email)
+            keyboard = (
+                Keyboard(inline=True)
+                .add(Text('\U0001f4e7 \u041f\u043e\u043b\u043d\u044b\u0439 \u043e\u0442\u0447\u0451\u0442 \u043d\u0430 email'), color=KeyboardButtonColor.PRIMARY)
+                .add(OpenLink(landing_url), color=KeyboardButtonColor.SECONDARY)
+            )
+            await message.answer(report, keyboard=keyboard)
             track_analysis(message.from_id, f'vk_{message.from_id}', actual_url)
 
             if analysis['hasErrors'] or analysis['hasWarnings']:
