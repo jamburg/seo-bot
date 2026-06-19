@@ -107,6 +107,14 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const urlParam = params.get('url')
+    if (urlParam) {
+      handleAnalyze(urlParam)
+    }
+  }, [])
+
+  useEffect(() => {
     const handleClick = (e) => {
       if (exportRef.current && !exportRef.current.contains(e.target)) {
         setShowExportMenu(false)

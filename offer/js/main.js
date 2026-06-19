@@ -99,6 +99,21 @@ document.addEventListener('DOMContentLoaded', () => {
     })
   })
 
+  /* Pre-fill site from ?url= */
+  const urlParam = new URLSearchParams(window.location.search).get('url')
+  const siteInput = document.getElementById('site')
+  if (urlParam && siteInput) {
+    siteInput.value = urlParam
+  }
+
+  /* Redirect to analyzer after success */
+  window.afterOrderSuccess = () => {
+    document.dispatchEvent(new Event('orderSuccess'))
+    if (urlParam) {
+      setTimeout(() => { window.location.href = 'https://seo-analiser.j-biz.ru/?url=' + encodeURIComponent(urlParam) }, 1500)
+    }
+  }
+
   /* Form validation and submit */
   const form = document.getElementById('leadForm')
   const successDiv = document.getElementById('formSuccess')
@@ -208,14 +223,6 @@ document.addEventListener('DOMContentLoaded', () => {
     })
 
   document.addEventListener('orderSuccess', () => {
-    fetch(counterUrl, { method: 'POST' }).catch(() => {
-      fetch(`${API_BASE}/api/leads`, { method: 'POST' }).catch(() => {})
-    })
+    fetch(counterUrl, { method: 'POST' }).catch(() => {})
   })
-
-  const origOnSuccess = window.afterOrderSuccess
-  window.afterOrderSuccess = () => {
-    document.dispatchEvent(new Event('orderSuccess'))
-    if (origOnSuccess) origOnSuccess()
-  }
 })

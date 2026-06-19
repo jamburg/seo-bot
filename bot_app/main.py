@@ -23,6 +23,7 @@ import requests as reqlib
 from analyzer import analyze_seo
 from stats import track_analysis, track_error, get_summary
 from emailer import send_email_async
+from urllib.parse import quote
 
 
 def status_emoji(status):
@@ -192,7 +193,8 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         report = format_report(analysis)
 
         shared.last_reports[user_id] = {'report_text': report, 'url': actual_url}
-        report_with_email = report + '\n\n📧 <b>Полный отчёт на email:</b> /email your@email.ru'
+        landing_url = f'https://audit-seo.j-biz.ru/?url={quote(actual_url)}'
+        report_with_email = report + f'\n\n📧 <b>Полный отчёт на email:</b> /email your@email.ru\n🚀 <b>Заказать аудит:</b> <a href="{landing_url}">audit-seo.j-biz.ru</a>'
         await msg.edit_text(report_with_email, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
         track_analysis(user_id, username, actual_url)
 
