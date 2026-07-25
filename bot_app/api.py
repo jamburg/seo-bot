@@ -2,7 +2,7 @@ import time
 import json
 import html
 import logging
-from fastapi import FastAPI, Query, HTTPException
+from fastapi import FastAPI, Query, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
@@ -28,6 +28,27 @@ app.add_middleware(
 PROXY_URL = 'https://seo-analiser.j-biz.ru/proxy.php'
 
 
+@app.on_event("startup")
+async def startup():
+    if shared.tg_app:
+        await shared.tg_app.initialize()
+        await shared.tg_app.start()
+        if shared.webhook_url:
+            webhook_endpoint = f"{shared.webhook_url}/webhook/telegram"
+            await shared.tg_app.bot.set_webhook(url=webhook_endpoint)
+            logger.info(f"Telegram webhook установлен: {webhook_endpoint}")
+        else:
+            logger.warning("WEBHOOK_URL не задан — webhook не установлен")
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    if shared.tg_app:
+        await shared.tg_app.stop()
+        await shared.tg_app.shutdown()
+        logger.info("Telegram bot остановлен")
+
+
 class AnalyzeRequest(BaseModel):
     url: str
 
@@ -42,6 +63,17 @@ class LeadRequest(BaseModel):
 @app.get('/health')
 async def health():
     return {'status': 'ok'}
+
+
+@app.post('/webhook/telegram')
+async def telegram_webhook(request: Request):
+    if not shared.tg_app:
+        raise HTTPException(503, 'Telegram bot not configured')
+    from telegram import Update
+    data = await request.json()
+    update = Update.de_json(data, shared.tg_app.bot)
+    await shared.tg_app.process_update(update)
+    return {'ok': True}
 
 
 @app.post('/api/email/send')
@@ -148,16 +180,17 @@ async def bot_vk_test(url: str = 'https://example.com'):
 
 @app.get('/api/bot/status')
 async def bot_status():
-    tg = shared.tg_bot_thread
     vk = shared.vk_bot_thread
+    tg_running = shared.tg_app is not None
     return {
         'telegram': {
-            'alive': tg is not None and tg.is_alive(),
-            'thread': tg.name if tg else None,
+            'alive': tg_running,
+            'mode': 'webhook' if tg_running else 'disabled',
         },
         'vk': {
             'alive': vk is not None and vk.is_alive(),
             'thread': vk.name if vk else None,
+            'mode': 'polling',
             'error': shared.vk_bot_error,
         },
     }

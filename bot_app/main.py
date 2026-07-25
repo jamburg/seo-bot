@@ -1,18 +1,16 @@
 import os
 import time
 import html
-import json
 import logging
 import threading
-import asyncio
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 TOKEN = os.environ.get('BOT_TOKEN', '')
 PROXY_URL = os.environ.get('PROXY_URL', 'https://seo-analiser.j-biz.ru/proxy.php')
+WEBHOOK_URL = os.environ.get('WEBHOOK_URL', '')
 
-import uvicorn
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from telegram.constants import ParseMode
@@ -250,50 +248,35 @@ async def analyze_url(update: Update, context: ContextTypes.DEFAULT_TYPE):
         track_error(f'{e}: {url}')
 
 
-def run_bot_polling():
-    try:
-        if not TOKEN:
-            logger.warning('BOT_TOKEN не задан — бот не запущен')
-            return
-
-        logger.info('Запуск Telegram бота...')
-        app = Application.builder().token(TOKEN).build()
-        app.add_handler(CommandHandler('start', start))
-        app.add_handler(CommandHandler('stats', stats_command))
-        app.add_handler(CommandHandler('help', start))
-        app.add_handler(CommandHandler('email', email_cmd))
-        app.add_handler(CallbackQueryHandler(handle_email_request, pattern='^email_request$'))
-        app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
-
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-
-        async def start_bot():
-            await app.initialize()
-            await app.start()
-            await app.updater.start_polling(drop_pending_updates=True)
-            logger.info('Telegram бот запущен (polling)')
-            while True:
-                await asyncio.sleep(3600)
-
-        loop.run_until_complete(start_bot())
-    except Exception as e:
-        logger.exception(f'Ошибка в боте: {e}')
-
-
 PORT = int(os.environ.get('PORT', 10000))
+
+
+def create_telegram_app():
+    if not TOKEN:
+        logger.warning('BOT_TOKEN не задан — Telegram бот не запущен')
+        return None
+
+    app = Application.builder().token(TOKEN).build()
+    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler('stats', stats_command))
+    app.add_handler(CommandHandler('help', start))
+    app.add_handler(CommandHandler('email', email_cmd))
+    app.add_handler(CallbackQueryHandler(handle_email_request, pattern='^email_request$'))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, analyze_url))
+    logger.info('Telegram Application создан (webhook mode)')
+    return app
 
 
 def main():
     from api import app as fastapi_app
-    PORT = int(os.environ.get('PORT', 10000))
 
-    shared.tg_bot_thread = threading.Thread(target=run_bot_polling, daemon=True)
-    shared.tg_bot_thread.start()
+    shared.tg_app = create_telegram_app()
+    shared.webhook_url = WEBHOOK_URL
 
     shared.vk_bot_thread = threading.Thread(target=run_vk_bot_polling, daemon=True)
     shared.vk_bot_thread.start()
 
+    import uvicorn
     logger.info(f'FastAPI сервер запущен на порту {PORT}')
     uvicorn.run(fastapi_app, host='0.0.0.0', port=PORT, log_level='info')
 
